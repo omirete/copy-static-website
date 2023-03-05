@@ -1,9 +1,13 @@
-import os
-import re
+# Python built-in libraries
+import os, re
+from urllib.parse import unquote
+
+# 3rd party libraries
 import requests
 from bs4 import BeautifulSoup
-from utils import create_dir_recursively
-from urllib.parse import unquote
+
+# Own code
+from ..utils import create_dir_recursively
 
 
 def download_html(url: str, path_save_to: str) -> None:
@@ -125,7 +129,7 @@ def fix_links(soup: BeautifulSoup, html_index_path: str):
         html.write(str(soup))
 
 
-def download_site(url: str, folder: str = None, force_download: bool = False):
+def download_full_site(url: str, folder: str = None, force_download: bool = False):
     site_folder = os.path.join('sites', folder)
     index_path = os.path.join(site_folder, 'index.html')
     prepare_web_folder(site_folder)
