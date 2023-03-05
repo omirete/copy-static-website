@@ -79,6 +79,8 @@ def download_local_resources(base_url: str, soup: BeautifulSoup, folder_save_to:
             elem = elements[i]
             try:
                 resource_path: str = elem[attribute]
+                if resource_path.startswith('/'):
+                    resource_path = resource_path[1:]
                 # We only care about resources that are local to the website we
                 # are downloading.
                 if not resource_path.startswith('http'):
