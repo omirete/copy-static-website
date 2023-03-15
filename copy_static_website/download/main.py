@@ -128,8 +128,35 @@ def fix_links(soup: BeautifulSoup, html_index_path: str):
     with open(html_index_path, 'w', encoding='utf-8') as html:
         html.write(str(soup))
 
+def add_google_analytics(soup: BeautifulSoup, html_index_path: str, google_analytics_id: str):
+    script = BeautifulSoup(f"""
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id={google_analytics_id}"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){"{dataLayer.push(arguments);}"}
+    gtag('js', new Date());
 
-def download_full_site(url: str, folder: str = None, force_download: bool = False):
+    gtag('config', '{google_analytics_id}');
+    </script>
+    """, 'html.parser')
+
+    soup.head.insert(0, script)
+    
+    with open(html_index_path, 'w', encoding='utf-8') as html:
+        html.write(str(soup))
+
+def make_sure_links_open_in_current_tab(soup: BeautifulSoup, html_index_path: str, links: list[str]):
+    for link in links:
+        elems = soup.find_all('a', {"href": link, "target": "_blank"})
+        for elem in elems:
+            del elem["target"]
+            del elem["rel"]
+    
+    with open(html_index_path, 'w', encoding='utf-8') as html:
+        html.write(str(soup))
+
+def download_full_site(url: str, folder: str = None, force_download: bool = False, google_analytics_id: str = None, links_to_force_open_in_current_tab: list[str] = []):
     site_folder = os.path.join('sites', folder)
     index_path = os.path.join(site_folder, 'index.html')
     prepare_web_folder(site_folder)
@@ -142,3 +169,13 @@ def download_full_site(url: str, folder: str = None, force_download: bool = Fals
         soup,
         index_path, 
         keywords=["modal_backdrop"])
+    make_sure_links_open_in_current_tab(
+        soup,
+        index_path,
+        links_to_force_open_in_current_tab
+    )
+    if google_analytics_id != None:
+        add_google_analytics(
+            soup=soup,
+            html_index_path=index_path,
+            google_analytics_id=google_analytics_id)
