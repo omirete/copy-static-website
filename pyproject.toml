@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "copy-static-website"
-version = "0.0.2"
+version = "0.0.3"
 description = "A hopefully simple tool to copy a static website, with all local resources included."
 authors = ["Federico Giancarelli <hello@federicogiancarelli.com>"]
 license = "MIT"
