@@ -34,3 +34,13 @@ def remove_parent_folder_from_path(path: os.PathLike) -> Union[os.PathLike, None
         return os.path.join(*path_parts)
     else:
         return None
+
+def join_path_parts_ignore_none(path_parts: list[Union[os.PathLike, None]]) -> os.PathLike:
+    parts_to_join = []
+    for part in path_parts:
+        if part != None:
+            parts_to_join.append(part)
+    if len(parts_to_join) > 0:
+        return os.path.join(*parts_to_join)
+    else:
+        return '/'
