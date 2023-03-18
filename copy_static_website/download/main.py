@@ -56,10 +56,14 @@ def download_fonts(site_url: str, html_index_path: str, root_folder_save_to: str
                 font_url = f'{site_root_url}/{font[1:]}'
                 filepath = os.path.join(root_folder_save_to, font[1:])
             else:
-                # These are relative urls, so we treat them as such.
+                # These are relative urls. We should treat them as such, but in
+                # this case we'll be just more efficient if we just have all our
+                # fonts in a centralized directory, so we will store them in the
+                # root folder and convert the link accordingly:
                 font_url = f'{site_root_url}/{font}'
-                filepath = join_path_parts_ignore_none(
-                    [root_folder_save_to, site_relative_path, font])
+                # filepath = join_path_parts_ignore_none(
+                #     [root_folder_save_to, site_relative_path, font])
+                filepath = os.path.join(root_folder_save_to, font)
 
             if os.path.exists(filepath) == False or force_download:
                 print(f'Font {i+1} of {len(fonts)}: Downloading...')
@@ -75,10 +79,13 @@ def download_fonts(site_url: str, html_index_path: str, root_folder_save_to: str
             else:
                 print(
                     f'Font {i+1} of {len(fonts)}: Skipped. Already downloaded.')
-    if site_relative_path != None or not html_index_path.endswith('index.html'):
-        with open(html_index_path, 'w', encoding='utf-8') as html_raw:
-            html_doc = html_doc.replace('src: url(fonts/', 'src: url(/fonts/')
-            html_raw.write(html_doc)
+    
+    # As stated before, we move all fonts stored in relative directories to the
+    # root of the site.
+    # if site_relative_path != None or not html_index_path.endswith('index.html'):
+    with open(html_index_path, 'w', encoding='utf-8') as html_raw:
+        html_doc = html_doc.replace('src: url(fonts/', 'src: url(/fonts/')
+        html_raw.write(html_doc)
 
 
 def remove_all_inline_scripts(soup: BeautifulSoup, html_index_path: str):
@@ -103,11 +110,13 @@ def prepare_web_folder(folder: str):
         create_dir_recursively(folder)
 
 
-def download_local_resources(site_url: str, html_index_path: str, root_folder_save_to: str, site_relative_path: str = None, force_download: bool = False):
+def download_local_resources(site_url: str, html_index_path: str, root_folder_save_to: str, site_relative_path: str = None, force_download: bool = False, force_media_files_to_root: bool = False):
     soup = get_soup(html_index_path)
     root_url = os.path.split(site_url)[0]
     if root_url.endswith('/'):
         root_url = root_url[:-1]
+
+    media_tags = ["img", "video", "image"]
 
     resources = {
         "link": "href",  # head
@@ -137,8 +146,11 @@ def download_local_resources(site_url: str, html_index_path: str, root_folder_sa
                             # Relative path
                             mid_part = '' if site_url.endswith('/') else '/'
                             resource_url = f'{site_url}{mid_part}{resource_path}'
-                            filepath = join_path_parts_ignore_none(
-                                [root_folder_save_to, site_relative_path, resource_path])
+                            if tag in media_tags and force_media_files_to_root == True:
+                                filepath = join_path_parts_ignore_none([root_folder_save_to, resource_path])
+                                elem[attribute] = '/' + elem[attribute]
+                            else:
+                                filepath = join_path_parts_ignore_none([root_folder_save_to, site_relative_path, resource_path])
                         if os.path.exists(filepath) == False or force_download:
                             print(f'{base_msg}: Downloading...')
                             response = requests.get(resource_url)
@@ -154,10 +166,6 @@ def download_local_resources(site_url: str, html_index_path: str, root_folder_sa
                         else:
                             print(
                                 f'{base_msg}: Skipped. It is already downloaded. File: {filepath}')
-                        if site_relative_path != None or not html_index_path.endswith('index.html'):
-                            raw_resource_path: str = elem[attribute]
-                            if not raw_resource_path.startswith('/'):
-                                elem[attribute] = '/' + elem[attribute]
                     else:
                         print(f'{base_msg}: Ignored. It is an external resource.')
                 else:
@@ -242,7 +250,18 @@ class InjectDirective():
         self.inject_as = inject_as
 
 
-def download_full_site(url: str, project_root_folder: str = None, site_relative_path: str = None, force_download: bool = False, google_analytics_id: str = None, links_to_force_open_in_current_tab: list[str] = [], save_html_as: str = 'index.html', inject_directives: list[InjectDirective] = []):
+def adjust_base_href(html_index_path: str, site_relative_path: str = None):
+    soup = get_soup(html_index_path)
+    elems = soup.find_all('base')
+    for elem in elems:
+        elem.decompose()
+    if site_relative_path != None:
+        new_base = soup.new_tag('base', attrs={'href': site_relative_path})
+        soup.head.append(new_base)
+    write_soup(soup, html_index_path)
+
+
+def download_full_site(url: str, project_root_folder: str = None, site_relative_path: str = None, force_download: bool = False, google_analytics_id: str = None, links_to_force_open_in_current_tab: list[str] = [], save_html_as: str = 'index.html', inject_directives: list[InjectDirective] = [], force_media_files_to_root: bool = False):
 
     download_root_folder = os.path.join('sites', project_root_folder)
     download_site_folder = join_path_parts_ignore_none(
@@ -255,6 +274,7 @@ def download_full_site(url: str, project_root_folder: str = None, site_relative_
     # -------------------------------------------------
 
     download_html(url, index_path)
+    adjust_base_href(index_path, site_relative_path)
     download_fonts(
         site_url=url,
         html_index_path=index_path,
@@ -268,6 +288,7 @@ def download_full_site(url: str, project_root_folder: str = None, site_relative_
         root_folder_save_to=download_root_folder,
         site_relative_path=site_relative_path,
         force_download=force_download,
+        force_media_files_to_root=force_media_files_to_root
     )
     fix_links(index_path)
     remove_inline_scripts_containing_keywords(
