@@ -6,7 +6,7 @@ from urllib.parse import unquote
 
 # 3rd party libraries
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from ..utils import join_path_parts_ignore_none
 
@@ -79,7 +79,7 @@ def download_fonts(site_url: str, html_index_path: str, root_folder_save_to: str
             else:
                 print(
                     f'Font {i+1} of {len(fonts)}: Skipped. Already downloaded.')
-    
+
     # As stated before, we move all fonts stored in relative directories to the
     # root of the site.
     # if site_relative_path != None or not html_index_path.endswith('index.html'):
@@ -147,10 +147,12 @@ def download_local_resources(site_url: str, html_index_path: str, root_folder_sa
                             mid_part = '' if site_url.endswith('/') else '/'
                             resource_url = f'{site_url}{mid_part}{resource_path}'
                             if tag in media_tags and force_media_files_to_root == True:
-                                filepath = join_path_parts_ignore_none([root_folder_save_to, resource_path])
+                                filepath = join_path_parts_ignore_none(
+                                    [root_folder_save_to, resource_path])
                                 elem[attribute] = '/' + elem[attribute]
                             else:
-                                filepath = join_path_parts_ignore_none([root_folder_save_to, site_relative_path, resource_path])
+                                filepath = join_path_parts_ignore_none(
+                                    [root_folder_save_to, site_relative_path, resource_path])
                         if os.path.exists(filepath) == False or force_download:
                             print(f'{base_msg}: Downloading...')
                             response = requests.get(resource_url)
@@ -215,6 +217,36 @@ def add_google_analytics(html_index_path: str, google_analytics_id: str):
     write_soup(soup, html_index_path)
 
 
+def copy_meta_from_html(html_index_path: str, head_html_path=str):
+    soup = get_soup(html_index_path)
+    soup_head = get_soup(head_html_path)
+
+    meta_elems = soup_head.head.find_all('meta')
+    for meta in meta_elems:
+        new_meta: Tag = meta
+        attrs = {}
+        for key in ["name", "property"]:
+            try:
+                attrs[key] = new_meta.attrs[key]
+            except KeyError:
+                pass
+        print(attrs)
+        if len(attrs.keys()) > 0:
+            existing_meta = soup.head.find('meta', attrs)
+            if existing_meta != None:
+                existing_meta.decompose()
+        soup.head.append(new_meta)
+
+    new_tite = soup_head.head.title
+    if new_tite != None:
+        existing_title = soup.head.title
+        if existing_title != None:
+            existing_title.decompose()
+        soup.head.append(new_tite)
+
+    write_soup(soup, html_index_path)
+
+
 def make_sure_links_open_in_current_tab(html_index_path: str, links: list[str]):
     soup = get_soup(html_index_path)
     for link in links:
@@ -261,7 +293,7 @@ def adjust_base_href(html_index_path: str, site_relative_path: str = None):
     write_soup(soup, html_index_path)
 
 
-def download_full_site(url: str, project_root_folder: str = None, site_relative_path: str = None, force_download: bool = False, google_analytics_id: str = None, links_to_force_open_in_current_tab: list[str] = [], save_html_as: str = 'index.html', inject_directives: list[InjectDirective] = [], force_media_files_to_root: bool = False):
+def download_full_site(url: str, project_root_folder: str = None, site_relative_path: str = None, force_download: bool = False, google_analytics_id: str = None, links_to_force_open_in_current_tab: list[str] = [], save_html_as: str = 'index.html', inject_directives: list[InjectDirective] = [], force_media_files_to_root: bool = False, html_copy_meta_from: os.PathLike = None):
 
     download_root_folder = os.path.join('sites', project_root_folder)
     download_site_folder = join_path_parts_ignore_none(
@@ -310,3 +342,8 @@ def download_full_site(url: str, project_root_folder: str = None, site_relative_
         add_google_analytics(
             html_index_path=index_path,
             google_analytics_id=google_analytics_id)
+    if html_copy_meta_from != None:
+        copy_meta_from_html(
+            html_index_path=index_path,
+            head_html_path=html_copy_meta_from,
+        )
