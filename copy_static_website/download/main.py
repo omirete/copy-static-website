@@ -293,7 +293,16 @@ def adjust_base_href(html_index_path: str, site_relative_path: str = None):
     write_soup(soup, html_index_path)
 
 
-def download_full_site(url: str, project_root_folder: str = None, site_relative_path: str = None, force_download: bool = False, google_analytics_id: str = None, links_to_force_open_in_current_tab: list[str] = [], save_html_as: str = 'index.html', inject_directives: list[InjectDirective] = [], force_media_files_to_root: bool = False, html_copy_meta_from: os.PathLike = None):
+def replace_strings(html_index_path: str, replacers: dict):
+    soup = get_soup(html_index_path)
+    html = str(soup)
+    for replace_what, replace_with in replacers.items():
+        html = html.replace(replace_what, replace_with)
+    soup = BeautifulSoup(html, 'html.parser')
+    write_soup(soup, html_index_path)
+
+
+def download_full_site(url: str, project_root_folder: str = None, site_relative_path: str = None, force_download: bool = False, google_analytics_id: str = None, links_to_force_open_in_current_tab: list[str] = [], save_html_as: str = 'index.html', inject_directives: list[InjectDirective] = [], force_media_files_to_root: bool = False, html_copy_meta_from: os.PathLike = None, replacers: dict = {}):
 
     download_root_folder = os.path.join('sites', project_root_folder)
     download_site_folder = join_path_parts_ignore_none(
@@ -323,6 +332,7 @@ def download_full_site(url: str, project_root_folder: str = None, site_relative_
         force_media_files_to_root=force_media_files_to_root
     )
     fix_links(index_path)
+    replace_strings(index_path, replacers)
     remove_inline_scripts_containing_keywords(
         index_path,
         keywords=["modal_backdrop"])
